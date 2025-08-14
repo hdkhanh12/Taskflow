@@ -5,6 +5,7 @@ import 'package:my_todo_app/features/main_app/presentation/widgets/task_item_wid
 import 'package:my_todo_app/features/main_app/services/task_service.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import 'add_edit_task_screen.dart';
 
 class TodaysTasksScreen extends StatelessWidget {
   const TodaysTasksScreen({super.key});
@@ -22,7 +23,7 @@ class TodaysTasksScreen extends StatelessWidget {
             // Hàng chứa nút Back
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 8.0),
-              child: BackButton(), // Tự động lấy màu từ theme
+              child: BackButton(),
             ),
 
             // StreamBuilder cho cả header và list
@@ -50,7 +51,7 @@ class TodaysTasksScreen extends StatelessWidget {
                       Expanded(
                         child: docs.isEmpty
                             ? Center(child: Text(AppLocalizations.of(context)!.notaskstoday))
-                            : _buildTaskList(docs),
+                            : _buildTaskList(docs, context),
                       ),
                     ],
                   );
@@ -76,13 +77,13 @@ class TodaysTasksScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTaskList(List<QueryDocumentSnapshot> docs) {
+  Widget _buildTaskList(List<QueryDocumentSnapshot> docs, BuildContext context) {
     final tasks = docs.map((doc) {
       final data = doc.data() as Map<String, dynamic>;
       return Task(
         id: doc.id,
         title: data['title'] ?? '',
-        time: data['time'] ?? '',
+        // time: data['time'] ?? '',
         category: data['categoryName'] ?? '',
         categoryId: data['categoryId'] ?? '',
         color: Color(data['colorValue'] ?? 0),
@@ -103,12 +104,12 @@ class TodaysTasksScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       children: groupedTasks.entries.map((entry) {
-        return _buildTaskCategory(entry.key, entry.value);
+        return _buildTaskCategory(context, entry.key, entry.value);
       }).toList(),
     );
   }
 
-  Widget _buildTaskCategory(String categoryName, List<Task> tasks) {
+  Widget _buildTaskCategory(BuildContext context, String categoryName, List<Task> tasks) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20.0),
       child: Column(
@@ -116,7 +117,21 @@ class TodaysTasksScreen extends StatelessWidget {
         children: [
           Text(categoryName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
-          ...tasks.map((task) => TaskItemWidget(task: task)).toList(),
+          ...tasks.map((task) {
+            return TaskItemWidget(
+              task: task,
+              // isSelected: Luôn là false vì màn hình này không có chế độ chọn
+              isSelected: false,
+              // onTap: Mở màn hình chỉnh sửa như bình thường
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => AddEditTaskScreen(task: task)),
+                );
+              },
+              // onLongPress: Không làm gì cả
+              onLongPress: () {},
+            );
+          }).toList(),
         ],
       ),
     );

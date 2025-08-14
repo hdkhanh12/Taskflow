@@ -232,4 +232,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get confirmlogouttext => 'Are you sure you want to log out?';
+
+  @override
+  String get addFolder => 'Add Folder';
+
+  @override
+  String get addTask => 'Add Task';
+
+  @override
+  String get sortbyFavorite => 'My Favorite';
 }

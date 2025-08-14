@@ -80,5 +80,8 @@
   "longBreak": "Long Break",
   "logout": "Log Out",
   "confirmlogout": "Confirm Log Out",
-  "confirmlogouttext": "Are you sure you want to log out?"
+  "confirmlogouttext": "Are you sure you want to log out?",
+  "addFolder": "Add Folder",
+  "addTask": "Add Task",
+  "sortbyFavorite": "My Favorite"
 }

@@ -2,13 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:intl/intl.dart'; // Import gói intl
+import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../data/models/category.dart';
 import '../../data/models/task.dart';
 import '../../services/category_service.dart';
 import '../../services/task_service.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 class AddEditTaskScreen extends StatefulWidget {
   // Thêm thuộc tính để nhận Task có sẵn (cho chế độ Edit)
@@ -25,6 +26,8 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
   final TaskService _taskService = TaskService();
   final CategoryService _categoryService = CategoryService();
 
+  late Future<void> _initializationFuture;
+
   List<Category> _categories = [];
   Category? _selectedCategory;
   DateTime _selectedTime = DateTime.now();
@@ -35,10 +38,11 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchInitialData();
+
+    _initializationFuture = _fetchInitialData();
   }
 
-  void _fetchInitialData() async {
+  Future<void> _fetchInitialData() async {
     // Luôn lấy danh sách categories
     final categoriesSnapshot = await _categoryService.getCategoriesStream().first;
     _categories = categoriesSnapshot.docs.map((doc) {
@@ -48,7 +52,6 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
         name: data['name'] ?? '',
         iconPath: data['iconPath'] ?? '',
         color: Color(data['colorValue'] ?? 0xFFFFFFFF),
-        taskCount: data['taskCount'] ?? 0,
       );
     }).toList();
 
@@ -56,13 +59,17 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
     if (_isEditMode) {
       final task = widget.task!;
       _titleController.text = task.title;
-      // Lưu lại categoryId ban đầu
       _initialCategoryId = task.categoryId;
+      _isAllDay = task.isAllDay;
       _selectedTime = task.dueTimestamp?.toDate() ?? DateTime.now();
-      _selectedCategory = _categories.firstWhere((cat) => cat.id == task.categoryId, orElse: () => _categories.first);
+      try {
+        _selectedCategory = _categories.firstWhere((cat) => cat.id == task.categoryId);
+      } catch (e) {
+        _selectedCategory = null;
+      }
     }
-    setState(() {}); // Cập nhật lại giao diện sau khi có dữ liệu
   }
+
 
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
@@ -93,6 +100,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
       return;
     }
 
+    /*
     String formattedTime;
     if (_isAllDay) {
       formattedTime = 'All day';
@@ -111,18 +119,19 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
     }
 
     final dueDateString = DateFormat('yyyy-MM-dd').format(_selectedTime);
-
+    */
 
     final taskData = Task(
       id: widget.task?.id,
       title: _titleController.text.trim(),
-      time: formattedTime,
+      // time: formattedTime,
       category: _selectedCategory!.name,
       categoryId: _selectedCategory!.id,
       color: _selectedCategory!.color,
       isCompleted: widget.task?.isCompleted ?? false,
       dueTimestamp: Timestamp.fromDate(_selectedTime),
-      dueDate: dueDateString,
+      // dueDate: dueDateString,
+      isAllDay: _isAllDay,
     );
 
     try {
@@ -133,7 +142,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
       }
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      print(e);
+      print("Error while saving: $e");
     }
   }
 
@@ -156,7 +165,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                 name: data['name'] ?? '',
                 iconPath: data['iconPath'] ?? '',
                 color: Color(data['colorValue'] ?? 0xFFFFFFFF),
-                taskCount: data['taskCount'] ?? 0,
+                // taskCount: data['taskCount'] ?? 0,
               );
             }).toList();
 
@@ -244,7 +253,6 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
 
@@ -255,151 +263,212 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
         scrolledUnderElevation: 0,
         elevation: 0,
         leading: const BackButton(),
+
+        actions: !_isEditMode
+            ? [
+          IconButton(
+            icon: const Icon(Icons.check),
+            onPressed: _saveTask,
+            tooltip: AppLocalizations.of(context)!.save,
+          ),
+        ]
+            : null, // Ở chế độ Edit thì không có actions
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Vùng 1: Điền tên
-            Flexible(
-              flex: 1,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryPurple.withOpacity(isDarkMode ? 0.3 : 1.0),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: TextField(
-                  controller: _titleController,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                  decoration: InputDecoration(
-                    hintText: AppLocalizations.of(context)!.taskName,
-                    border: InputBorder.none,
+      body: FutureBuilder<void>(
+        future: _initializationFuture,
+        builder: (context, snapshot) {
+          // Khi đang chờ dữ liệu, hiển thị vòng xoay
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // Khi có lỗi, hiển thị thông báo
+          if (snapshot.hasError) {
+            return Center(child: Text("Error: ${snapshot.error}"));
+          }
+
+          // Khi dữ liệu đã sẵn sàng, vẽ giao diện chính
+          return Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Vùng 1: Điền tên
+                Flexible(
+                  flex: 1,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(color: AppColors.primaryPurple.withOpacity(isDarkMode ? 0.3 : 1.0), borderRadius: BorderRadius.circular(20)),
+                    child: TextField(
+                      controller: _titleController,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                      decoration: InputDecoration(hintText: AppLocalizations.of(context)!.taskName, border: InputBorder.none),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-            // Vùng 2: Chọn giờ
-            Text(AppLocalizations.of(context)!.time, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            Flexible(
-              flex: 5,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryPurple.withOpacity(isDarkMode ? 0.3 : 1.0),
-                  borderRadius: BorderRadius.circular(20),
+                // Vùng 2: Chọn giờ
+                Text(AppLocalizations.of(context)!.time, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 12),
+                Flexible(
+                  flex: 5,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryPurple.withOpacity(isDarkMode ? 0.3 : 1.0),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+                        // Công tắc "All Day"
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(AppLocalizations.of(context)!.allDay, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                            Switch(
+                              value: _isAllDay,
+                              onChanged: (value) {
+                                setState(() {
+                                  _isAllDay = value;
+                                  if (value) {
+                                    _selectedTime = DateTime(_selectedTime.year, _selectedTime.month, _selectedTime.day, 0, 0);
+                                  }
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Hiển thị Lịch (khi All Day = true) hoặc Con lăn (khi All Day = false)
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: _isAllDay
+                            // --- GIAO DIỆN LỊCH ---
+                                ? TableCalendar(
+                              key: const ValueKey('table_calendar_weekly'),
+                              focusedDay: _selectedTime,
+                              firstDay: DateTime.utc(2020, 1, 1),
+                              lastDay: DateTime.utc(2030, 12, 31),
+
+                              calendarFormat: CalendarFormat.twoWeeks,
+
+                              headerStyle: HeaderStyle(
+                                formatButtonVisible: false,
+                                titleCentered: true,
+                                titleTextStyle: TextStyle(color: theme.textTheme.bodyMedium?.color, fontWeight: FontWeight.bold),
+                                leftChevronIcon: Icon(Icons.chevron_left, color: theme.textTheme.bodyMedium?.color),
+                                rightChevronIcon: Icon(Icons.chevron_right, color: theme.textTheme.bodyMedium?.color),
+                              ),
+                              // Kiểu cho các ngày trong tuần (T2, T3, T4...)
+                              daysOfWeekStyle: DaysOfWeekStyle(
+                                weekdayStyle: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7)),
+                                weekendStyle: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7)),
+                              ),
+                              // Kiểu cho các ngày (1, 2, 3...)
+                              calendarStyle: CalendarStyle(
+                                defaultTextStyle: TextStyle(color: theme.textTheme.bodyMedium?.color),
+                                weekendTextStyle: TextStyle(color: theme.textTheme.bodyMedium?.color), // Chữ cuối tuần
+                                outsideTextStyle: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.4)), // Chữ ngày của tháng khác
+                                todayDecoration: BoxDecoration(
+                                  color: theme.colorScheme.primary.withOpacity(0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                selectedDecoration: BoxDecoration(
+                                  color: theme.colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              selectedDayPredicate: (day) {
+                                return isSameDay(_selectedTime, day);
+                              },
+                              onDaySelected: (selectedDay, focusedDay) {
+                                setState(() {
+                                  _selectedTime = selectedDay;
+                                });
+                              },
+                            )
+                            // --- GIAO DIỆN CON LĂN CHỌN GIỜ ---
+                                : Column(
+                              key: const ValueKey('time_picker'),
+                              children: [
+                                Row(
+                                  children: [
+                                    InkWell(
+                                      // Khi All Day bật, không cho phép nhấn vào đây
+                                      onTap: _isAllDay ? null : _selectDate,
+                                      child: Text(
+                                        DateFormat('EEEE, d/M').format(_selectedTime),
+                                        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18),
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(color: theme.colorScheme.primaryContainer, borderRadius: BorderRadius.circular(8)),
+                                      child: Text(DateFormat('HH:mm').format(_selectedTime), style: TextStyle(fontWeight: FontWeight.w500, fontSize: 18, color: theme.colorScheme.onPrimaryContainer)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      // CupertinoPicker cho Giờ
+                                      Expanded(
+                                        child: CupertinoPicker(
+                                          scrollController: FixedExtentScrollController(initialItem: _selectedTime.hour),
+                                          itemExtent: 60.0,
+                                          onSelectedItemChanged: (int index) => setState(() => _selectedTime = DateTime(_selectedTime.year, _selectedTime.month, _selectedTime.day, index, _selectedTime.minute)),
+                                          children: List.generate(24, (i) => Center(child: Text('$i', style: const TextStyle(fontSize: 28)))),
+                                        ),
+                                      ),
+                                      Text(':', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: theme.textTheme.bodyMedium?.color)),
+                                      Expanded(
+                                        child: CupertinoPicker(
+                                          itemExtent: 60.0,
+                                          scrollController: FixedExtentScrollController(initialItem: _selectedTime.hour),
+                                          onSelectedItemChanged: (int index) => setState(() => _selectedTime = DateTime(_selectedTime.year, _selectedTime.month, _selectedTime.day, _selectedTime.hour, index)),
+                                          children: List.generate(60, (i) => Center(child: Text(i.toString().padLeft(2, '0'), style: const TextStyle(fontSize: 28)))),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(AppLocalizations.of(context)!.allDay, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                        Switch(
-                          value: _isAllDay,
-                          onChanged: (value) => setState(() => _isAllDay = value),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        InkWell(
-                          onTap: _selectDate,
-                          child: Text(
-                            DateFormat('EEEE, d/M').format(_selectedTime),
-                            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18), // Tăng cỡ chữ
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            DateFormat('HH:mm').format(_selectedTime),
-                            style: TextStyle(fontWeight: FontWeight.w500, fontSize: 18, color: theme.colorScheme.onPrimaryContainer),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
+                const SizedBox(height: 24),
+
+                // Vùng 3: Chọn thư mục
+                Flexible(
+                  flex: 1,
+                  child: GestureDetector(
+                    onTap: _showFolderPicker,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: AppColors.primaryPurple.withOpacity(isDarkMode ? 0.3 : 1.0), borderRadius: BorderRadius.circular(20)),
                       child: Row(
                         children: [
-                          Expanded(
-                            child: CupertinoPicker(
-                              itemExtent: 60.0,
-                              scrollController: FixedExtentScrollController(initialItem: _selectedTime.hour),
-                              onSelectedItemChanged: (int index) {
-                                setState(() {
-                                  _selectedTime = DateTime(_selectedTime.year, _selectedTime.month, _selectedTime.day, index, _selectedTime.minute);
-                                });
-                              },
-                              children: List.generate(24, (i) {
-                                return Center(child: Text('$i', style: const TextStyle(fontSize: 28))); // Tăng cỡ chữ
-                              }),
-                            ),
-                          ),
-                          Text(':', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: theme.textTheme.bodyMedium?.color)),
-                          Expanded(
-                            child: CupertinoPicker(
-                              itemExtent: 60.0,
-                              scrollController: FixedExtentScrollController(initialItem: _selectedTime.minute),
-                              onSelectedItemChanged: (int index) {
-                                setState(() {
-                                  _selectedTime = DateTime(_selectedTime.year, _selectedTime.month, _selectedTime.day, _selectedTime.hour, index);
-                                });
-                              },
-                              children: List.generate(60, (i) {
-                                return Center(child: Text(i.toString().padLeft(2, '0'), style: const TextStyle(fontSize: 28))); // Tăng cỡ chữ
-                              }),
-                            ),
-                          ),
+                          _selectedCategory != null ? SvgPicture.asset(_selectedCategory!.iconPath, height: 24, width: 24) : const Icon(Icons.folder_open_outlined),
+                          const SizedBox(width: 12),
+                          Text(_selectedCategory?.name ?? AppLocalizations.of(context)!.selectFolder, style: const TextStyle(fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 24),
-
-            // Vùng 3: Chọn thư mục
-          Flexible(
-            flex: 1,
-            child:
-            GestureDetector(
-              onTap: _showFolderPicker,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryPurple.withOpacity(isDarkMode ? 0.3 : 1.0),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    _selectedCategory != null
-                        ? SvgPicture.asset(_selectedCategory!.iconPath, height: 24, width: 24)
-                        : const Icon(Icons.folder_open_outlined),
-                    const SizedBox(width: 12),
-                    Text(
-                      _selectedCategory?.name ?? AppLocalizations.of(context)!.selectFolder,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ),
-          ],
-        ),
+          );
+        },
       ),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.only(
@@ -420,8 +489,8 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                           ? 'assets/images/mark_as_done_dark.png'
                           : 'assets/images/mark_as_done.png'
                   ), height: 30, width: 30),
-              label: AppLocalizations.of(context)!.done,
-              onTap: _handleMarkAsDone,
+              label: AppLocalizations.of(context)!.save,
+              onTap: _saveTask,
             ),
             _buildBottomActionButton(
               context: context,
@@ -449,7 +518,9 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
           ],
         )
         // Giao diện khi ở chế độ "Add"
-            : Row(
+            : null
+        /*
+        Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
 
@@ -478,6 +549,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
             ),
           ],
         ),
+        */
       ),
     );
   }
@@ -487,7 +559,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
     required Widget iconWidget,
     required String label,
     required VoidCallback? onTap, // Cho phép onTap là null để vô hiệu hóa nút
-    Color? color, // Cho phép truyền màu tùy chỉnh
+    Color? color,
   }) {
     // Lấy màu chữ mặc định từ theme
     final textColor = color ?? Theme.of(context).textTheme.bodyMedium?.color;
@@ -500,13 +572,12 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Icon sẽ tự động thừa hưởng màu từ IconTheme của theme
             iconWidget,
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                color: onTap == null ? Colors.grey : textColor, // Làm mờ chữ nếu nút bị vô hiệu hóa
+                color: onTap == null ? Colors.grey : textColor,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),

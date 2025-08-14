@@ -79,7 +79,10 @@
   "longBreak": "Nghỉ ngơi dài",
   "logout": "Đăng xuất",
   "confirmlogout": "Xác nhận đăng xuất",
-  "confirmlogouttext": "Bạn có chắc chắn muốn đăng xuất?"
+  "confirmlogouttext": "Bạn có chắc chắn muốn đăng xuất?",
+  "addFolder": "Thêm thư mục",
+  "addTask": "Thêm công việc",
+  "sortByFavorite": "Mục yêu thích"
 }
 
 

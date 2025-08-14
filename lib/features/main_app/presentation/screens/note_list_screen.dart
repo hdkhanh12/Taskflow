@@ -14,13 +14,14 @@ enum NoteSortOption {
   nameDesc,
   dateAsc,
   dateDesc,
+  favorite,
 }
 
 class NoteListScreen extends StatefulWidget {
 
   final bool showBackButton;
 
-  const NoteListScreen({super.key, this.showBackButton = false}); // Mặc định là không hiển thị
+  const NoteListScreen({super.key, this.showBackButton = false});
 
   @override
   State<NoteListScreen> createState() => _NoteListScreenState();
@@ -70,8 +71,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(AppLocalizations.of(context)!.confirmDelete),
-        content: Text('Are you sure you want to delete ${_selectedNoteIds.length} notes?'),        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+        content: Text('Are you sure you want to delete ${_selectedNoteIds.length} notes?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(AppLocalizations.of(context)!.cancel)),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(AppLocalizations.of(context)!.delete, style: const TextStyle(color: Colors.red)),
@@ -175,6 +177,10 @@ class _NoteListScreenState extends State<NoteListScreen> {
       onSelected: (option) {
         setState(() {
           switch (option) {
+            case NoteSortOption.favorite:
+              _orderBy = 'isFavorite';
+              _descending = true; // `true` sẽ được xếp lên đầu
+              break;
             case NoteSortOption.nameAsc:
               _orderBy = 'title';
               _descending = false;
@@ -196,10 +202,14 @@ class _NoteListScreenState extends State<NoteListScreen> {
       },
       icon: Icon(
         Icons.sort,
-        // Kiểm tra theme và chọn màu phù hợp
         color: isDarkMode ? Colors.white : Colors.black,
       ),
       itemBuilder: (context) => [
+        PopupMenuItem(
+            value: NoteSortOption.favorite,
+            child: Text(AppLocalizations.of(context)!.sortbyFavorite) // Giả sử bạn có key này
+        ),
+        const PopupMenuDivider(),
         PopupMenuItem(value: NoteSortOption.dateDesc, child: Text(AppLocalizations.of(context)!.sortbyDateNewest)),
         PopupMenuItem(value: NoteSortOption.dateAsc, child: Text(AppLocalizations.of(context)!.sortbyDateOldest)),
         PopupMenuItem(value: NoteSortOption.nameAsc, child: Text(AppLocalizations.of(context)!.sortbyNameAZ)),
@@ -212,6 +222,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
   Widget build(BuildContext context) {
     // Lấy theme hiện tại
     final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    const baseColor = Color(0xFFBEC4FE);
+    final fabAddColor = baseColor.withOpacity(isDarkMode ? 1.0 : 1.0);
 
     return PopScope(
       canPop: !_isSelectionMode,
@@ -233,7 +246,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(context), // Truyền context vào
+                _buildHeader(context),
                 const SizedBox(height: 20),
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
@@ -286,7 +299,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                // SỬA LẠI MÀU NỀN
                                 color: Color(note.colorValue).withOpacity(theme.brightness == Brightness.dark ? 0.4 : 1),
                                 borderRadius: BorderRadius.circular(10),
                                 border: isSelected ? Border.all(color: theme.colorScheme.primary, width: 3) : null,
@@ -302,23 +314,39 @@ class _NoteListScreenState extends State<NoteListScreen> {
                                     maxLines: 7,
                                     overflow: TextOverflow.ellipsis,
                                   ),
+                                  // const Spacer(),
                                   const SizedBox(height: 12),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      Icon(note.isFavorite ? Icons.star : Icons.star_border, size: 20),
+
+                                      // Bọc Icon của bạn trong một GestureDetector
+                                      GestureDetector(
+                                        onTap: () {
+                                          final noteService = NoteService();
+                                          noteService.updateNoteFavoriteStatus(note.id!, !note.isFavorite);
+                                        },
+                                        child: Icon(
+                                          note.isFavorite ? Icons.star : Icons.star_border,
+                                          size: 25,
+                                          color: Colors.orangeAccent,
+                                        ),
+                                      ),
+
+                                      const Spacer(),
                                       Text(
                                         DateFormat('dd/MM').format(note.createdAt.toDate()),
                                         style: TextStyle(
                                           fontSize: 12,
-                                          // Kiểm tra theme và chọn màu tương ứng
                                           color: Theme.of(context).brightness == Brightness.dark
-                                              ? Colors.white70 // Màu cho theme tối
-                                              : Colors.black54, // Màu cho theme sáng
+                                              ? Colors.white70
+                                              : Colors.black54,
                                         ),
                                       ),
                                     ],
-                                  ),
+                                  )
+
+
                                 ],
                               ),
                             ),
@@ -343,8 +371,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           onPressed: () {
             Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddEditNoteScreen()));
           },
-          // Lấy màu từ theme
-          backgroundColor: theme.colorScheme.primary,
+          backgroundColor: fabAddColor,
           child: const Icon(Icons.add, color: Colors.white, size: 50),
         ),
       ),

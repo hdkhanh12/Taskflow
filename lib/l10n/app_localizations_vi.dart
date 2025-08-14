@@ -232,4 +232,13 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get confirmlogouttext => 'Bạn có chắc chắn muốn đăng xuất?';
+
+  @override
+  String get addFolder => 'Thêm thư mục';
+
+  @override
+  String get addTask => 'Thêm công việc';
+
+  @override
+  String get sortbyFavorite => 'My Favorite';
 }

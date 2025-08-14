@@ -53,7 +53,7 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
       name: _nameController.text.trim(),
       iconPath: AppIcons.folderIcons[_selectedIconIndex],
       color: _colors[_selectedColorIndex],
-      taskCount: widget.category?.taskCount ?? 0,
+      // taskCount: widget.category?.taskCount ?? 0,
     );
 
     try {
@@ -144,7 +144,7 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
                     Text(
                       AppLocalizations.of(context)!.name,
                       style: TextStyle(fontSize: 14, color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white70 // Màu cho theme tối
+                          ? Colors.white70
                           : Colors.black54,),
                     ),
                     TextField(
@@ -243,7 +243,7 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Đẩy các nút về bên phải
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 // Nút Save
                 TextButton(

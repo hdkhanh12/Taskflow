@@ -541,6 +541,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Are you sure you want to log out?'**
   String get confirmlogouttext;
+
+  /// No description provided for @addFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Folder'**
+  String get addFolder;
+
+  /// No description provided for @addTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Task'**
+  String get addTask;
+
+  /// No description provided for @sortbyFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'My Favorite'**
+  String get sortbyFavorite;
 }
 
 class _AppLocalizationsDelegate

@@ -45,12 +45,6 @@ class CategoryService {
     await _categoriesCollection.doc(categoryId).delete();
   }
 
-  Future<void> updateTaskCount(String categoryId, int increment) async {
-    await _categoriesCollection.doc(categoryId).update({
-      'taskCount': FieldValue.increment(increment),
-    });
-  }
-
   DocumentReference getCategoryReference(String categoryId) {
     return _categoriesCollection.doc(categoryId);
   }

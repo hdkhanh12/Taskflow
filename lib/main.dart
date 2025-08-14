@@ -59,8 +59,9 @@ class MyApp extends StatelessWidget {
             ),
             fontFamily: 'Inter',
             scaffoldBackgroundColor: Colors.white,
-
-
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Color(0xFFE1DFFF)
+            ),
             textTheme: const TextTheme(
               headlineMedium: TextStyle(fontFamily: 'Poppins', color: Color(0xFF1E1E1E), fontWeight: FontWeight.w600, fontSize: 24),
 

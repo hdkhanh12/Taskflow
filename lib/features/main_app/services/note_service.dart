@@ -38,6 +38,12 @@ class NoteService {
     await batch.commit();
   }
 
+  Future<void> updateNoteFavoriteStatus(String noteId, bool isFavorite) async {
+    await _notesCollection.doc(noteId).update({
+      'isFavorite': isFavorite,
+    });
+  }
+
   Stream<QuerySnapshot> getLatestNoteStream() {
     return _notesCollection
         .orderBy('updatedAt', descending: true)

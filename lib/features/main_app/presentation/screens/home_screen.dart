@@ -47,9 +47,9 @@ class HomeScreen extends StatelessWidget {
             children: [
               _buildHeader(context),
               const SizedBox(height: 24),
-              Expanded(flex: 3, child: _buildPomodoroCard(context)),
+              Expanded(flex: 2, child: _buildPomodoroCard(context)),
               const SizedBox(height: 24),
-              Expanded(flex: 4, child: _buildTodayTasksSection(context)),
+              Expanded(flex: 5, child: _buildTodayTasksSection(context)),
               const SizedBox(height: 24),
               Expanded(flex: 3, child: _buildNotesSection(context)),
             ],
@@ -121,7 +121,7 @@ class HomeScreen extends StatelessWidget {
     return Consumer<TimerProvider>(
       builder: (context, timer, child) {
         return Container(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           decoration: BoxDecoration(
             color: theme.colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(10),
@@ -141,20 +141,18 @@ class HomeScreen extends StatelessWidget {
                   Text(
                     timer.sessionCountText,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      // Kiểm tra xem có phải là theme tối không
                         color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white // Nếu là theme tối, dùng màu trắng
-                            : Colors.grey[900], // Nếu là theme sáng, dùng màu xám đậm
+                            ? Colors.white
+                            : Colors.grey[900],
                         fontWeight: FontWeight.w500
                     ),                  ),
                   const SizedBox(width: 12),
                   Text(
                     '${timer.formattedTime} left',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      // Kiểm tra xem có phải là theme tối không
                         color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white // Nếu là theme tối, dùng màu trắng
-                            : Colors.grey[900], // Nếu là theme sáng, dùng màu xám đậm
+                            ? Colors.white
+                            : Colors.grey[900],
                         fontWeight: FontWeight.w500
                     ),                  ),
                   const Spacer(),
@@ -169,9 +167,8 @@ class HomeScreen extends StatelessWidget {
                       alignment: Alignment.center,
                       child: Icon(
                         timer.isTimerRunning ? Icons.pause : Icons.play_arrow,
-                        // Sửa lại dòng này
                         color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                        size: 48,
+                        size: 40,
                       ),
                     ),
                     onPressed: timer.isTimerRunning ? timer.pauseTimer : timer.resumeTimer,
@@ -185,119 +182,167 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTodayTasksSection(BuildContext context) {
+  Widget _buildTaskCard(BuildContext context, Task task) {
     final theme = Theme.of(context);
     final TaskService taskService = TaskService();
-    String _extractTime(String fullTime) {
-      if (fullTime.contains(' ')) return fullTime.split(' ').last;
-      return fullTime;
+
+    // Tính toán chiều rộng cho mỗi card
+    final screenWidth = MediaQuery.of(context).size.width;
+    final itemWidth = (screenWidth - 48 - 16) / 2; // 48=padding(24*2), 16=spacing
+
+    return SizedBox(
+      width: itemWidth,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddEditTaskScreen(task: task))),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: task.color.withOpacity(theme.brightness == Brightness.dark ? 0.6 : 1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min, // Giúp Column co lại theo nội dung
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      if (task.id != null && task.categoryId != null) {
+                        taskService.updateTaskCompletion(task.id!, task.categoryId!, true);
+                      }
+                    },
+                    child: const CircleAvatar(radius: 12, backgroundColor: Colors.white),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                ],
+              ),
+              // Dùng SizedBox thay cho Spacer/Expanded để có khoảng cách cố định
+              const SizedBox(height: 12),
+              Text(
+                task.title,
+                style: Theme.of(context).textTheme.bodyLarge,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded( // Dùng Expanded ở đây để category không bị tràn nếu quá dài
+                    child: Text(
+                      task.category,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  _buildTaskTimeWidget(task, context),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTaskTimeWidget(Task task, BuildContext context) {
+    if (task.dueTimestamp == null) {
+      return const SizedBox.shrink();
     }
+    final theme = Theme.of(context);
+
+    final dateTime = task.dueTimestamp!.toDate();
+    final String displayText = task.isAllDay
+        ? DateFormat('dd/MM').format(dateTime)
+        : DateFormat('HH:mm').format(dateTime);
+
+    return Text(
+      displayText,
+      style: TextStyle(
+        fontSize: 12,
+        color: theme.textTheme.bodySmall?.color,
+        fontWeight: FontWeight.bold,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
+  }
+
+  Widget _buildTodayTasksSection(BuildContext context) {
+    final TaskService taskService = TaskService();
 
     return StreamBuilder<QuerySnapshot>(
       stream: taskService.getTasksForTodayStream(),
       builder: (context, snapshot) {
-        final docs = snapshot.data?.docs ?? [];
-        final taskCount = docs.length;
+        // Luôn lấy số lượng task để hiển thị trên header
+        final taskCount = snapshot.data?.docs.length ?? 0;
 
+        // Cấu trúc chính luôn là một Column
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionHeader(context, AppLocalizations.of(context)!.today, '$taskCount tasks left', AppLocalizations.of(context)!.viewAll, () {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TodaysTasksScreen()));
-            }),
+            // 1. Header luôn được hiển thị, bất kể có task hay không
+            _buildSectionHeader(
+              context,
+              AppLocalizations.of(context)!.today,
+              '$taskCount tasks left',
+              AppLocalizations.of(context)!.viewAll,
+                  () {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TodaysTasksScreen()));
+              },
+            ),
             const SizedBox(height: 16),
-            if (snapshot.connectionState == ConnectionState.waiting)
-              const Expanded(child: Center(child: CircularProgressIndicator()))
-            else if (docs.isEmpty)
-              Expanded(child: Center(child: Text(AppLocalizations.of(context)!.notaskstoday, style: const TextStyle(color: Colors.grey))))
-            else
-              Expanded(
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 1.5,
-                  ),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final data = docs[index].data() as Map<String, dynamic>;
-                    final task = Task(
-                      id: docs[index].id,
-                      title: data['title'] ?? '',
-                      time: data['time'] ?? '',
-                      category: data['categoryName'] ?? '',
-                      categoryId: data['categoryId'] ?? '',
-                      color: Color(data['colorValue'] ?? 0),
-                      isCompleted: data['isCompleted'] ?? false,
-                    );
-                    return InkWell(
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddEditTaskScreen(task: task))),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          // SỬA LẠI Ở ĐÂY: Dùng màu của task nhưng vẫn giữ độ trong suốt
-                          color: task.color.withOpacity(theme.brightness == Brightness.dark ? 0.6 : 1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                // === PHẦN THAY ĐỔI CHÍNH ===
-                                // Bọc CircleAvatar bằng GestureDetector
-                                GestureDetector(
-                                  // onTap của riêng ô tròn sẽ đánh dấu hoàn thành
-                                  behavior: HitTestBehavior.opaque,
-                                  onTap: () {
-                                    if (task.id != null && task.categoryId != null) {
-                                      taskService.updateTaskCompletion(task.id!, task.categoryId!, true);
-                                    }
-                                  },
-                                  child: const CircleAvatar(radius: 12, backgroundColor: Colors.white),
-                                ),
-                                const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-                              ],
-                            ),
-                            const Spacer(),
-                            Text(task.title, style: Theme.of(context).textTheme.bodyLarge, maxLines: 2, overflow: TextOverflow.ellipsis),
 
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Text(
-                                  task.category,
-                                  // Thay thế TextStyle cố định...
-                                  // style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: Color(0xFF242424), fontWeight: FontWeight.w400),
-
-                                  // ...bằng cách gọi style từ Theme đã định nghĩa
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                                const Spacer(),
-                                Text(
-                                  _extractTime(task.time),
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
+            // 2. Nội dung bên dưới được tách ra hàm riêng và luôn nằm trong Expanded
+            Expanded(
+              child: _buildTodayTasksContent(context, snapshot),
+            ),
           ],
         );
       },
     );
   }
 
-  // Trong class HomeScreen
+  Widget _buildTodayTasksContent(BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
+    // --- Xử lý các trạng thái ban đầu ---
+    if (snapshot.hasError) {
+      return Center(child: Text('Đã có lỗi xảy ra: ${snapshot.error}'));
+    }
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+      return Center(child: Text(AppLocalizations.of(context)!.notaskstoday, style: const TextStyle(color: Colors.grey)));
+    }
 
-  // Trong class HomeScreen
+    // --- Dùng Wrap để hiển thị ---
+    final docs = snapshot.data!.docs;
+    return Wrap(
+      spacing: 16,    // Khoảng cách ngang
+      runSpacing: 16, // Khoảng cách dọc
+      alignment: WrapAlignment.start,
+      children: docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final task = Task(
+          id: doc.id,
+          title: data['title'] ?? '',
+          category: data['categoryName'] ?? '',
+          categoryId: data['categoryId'] ?? '',
+          color: Color(data['colorValue'] ?? 0),
+          isCompleted: data['isCompleted'] ?? false,
+          dueTimestamp: data['dueTimestamp'],
+          isAllDay: data['isAllDay'] ?? false,
+        );
+        return _buildTaskCard(context, task);
+      }).toList(),
+    );
+  }
 
   Widget _buildNotesSection(BuildContext context) {
     final theme = Theme.of(context);
@@ -340,7 +385,6 @@ class HomeScreen extends StatelessWidget {
                     builder: (context, constraints) {
                       final noteDoc = snapshot.data!.docs.first;
                       final noteData = noteDoc.data() as Map<String, dynamic>;
-                      // TẠO BIẾN note Ở ĐÂY
                       final note = Note(
                         id: noteDoc.id,
                         title: noteData['title'] ?? '',
@@ -356,14 +400,12 @@ class HomeScreen extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            // Tăng opacity nếu là theme sáng, giảm nếu là theme tối
                             color: Color(note.colorValue).withOpacity(theme.brightness == Brightness.light ? 1 : 0.2),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Bây giờ có thể dùng 'note' ở đây
                               Text(
                                 note.title,
                                 style: Theme.of(context).textTheme.bodyLarge,
@@ -377,10 +419,9 @@ class HomeScreen extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: (constraints.maxHeight / 24).floor(), // Tự tính số dòng tối đa
                                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    // Kiểm tra xem có phải là theme tối không
                                       color: Theme.of(context).brightness == Brightness.dark
-                                          ? Colors.white // Nếu là theme tối, dùng màu trắng
-                                          : Colors.grey[900], // Nếu là theme sáng, dùng màu xám đậm
+                                          ? Colors.white
+                                          : Colors.grey[900],
                                       fontWeight: FontWeight.w500
                                   ),
                                 ),
@@ -394,10 +435,9 @@ class HomeScreen extends StatelessWidget {
                                   Text(
                                     DateFormat('dd/MM').format(note.createdAt.toDate()),
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      // Kiểm tra xem có phải là theme tối không
                                         color: Theme.of(context).brightness == Brightness.dark
-                                            ? Colors.white // Nếu là theme tối, dùng màu trắng
-                                            : Colors.grey[900], // Nếu là theme sáng, dùng màu xám đậm
+                                            ? Colors.white
+                                            : Colors.grey[900],
                                         fontWeight: FontWeight.w500
                                     ),
                                   ),

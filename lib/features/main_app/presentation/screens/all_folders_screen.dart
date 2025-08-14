@@ -6,6 +6,7 @@ import 'package:my_todo_app/features/main_app/presentation/screens/add_edit_fold
 import 'package:my_todo_app/features/main_app/services/category_service.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../services/task_service.dart';
 
 class AllFoldersScreen extends StatelessWidget {
   const AllFoldersScreen({super.key});
@@ -70,7 +71,7 @@ class AllFoldersScreen extends StatelessWidget {
                       name: data['name'] ?? '',
                       iconPath: data['iconPath'] ?? '',
                       color: Color(data['colorValue'] ?? 0xFFFFFFFF),
-                      taskCount: data['taskCount'] ?? 0,
+                      // taskCount: data['taskCount'] ?? 0,
                     );
                   }).toList();
 
@@ -106,9 +107,18 @@ class AllFoldersScreen extends StatelessWidget {
                               const SizedBox(width: 16),
                               Text(category.name, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
                               const Spacer(),
-                              Text(
-                                category.taskCount.toString(),
-                                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                              StreamBuilder<int>(
+                                // Gọi đến hàm đếm mới trong TaskService
+                                stream: TaskService().getIncompleteTasksCountStreamForCategory(category.id!),
+                                builder: (context, snapshot) {
+                                  // Lấy số lượng từ stream, nếu chưa có dữ liệu thì hiển thị 0
+                                  final count = snapshot.data ?? 0;
+
+                                  return Text(
+                                    count.toString(), // Hiển thị số lượng task
+                                    style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                                  );
+                                },
                               ),
                             ],
                           ),

@@ -5,13 +5,13 @@ class Category {
   final String name;
   final String iconPath;
   final Color color;
-  final int taskCount;
+  // final int taskCount;
 
   Category({
     this.id,
     required this.name,
     required this.iconPath,
     required this.color,
-    required this.taskCount,
+    // required this.taskCount,
   });
 }

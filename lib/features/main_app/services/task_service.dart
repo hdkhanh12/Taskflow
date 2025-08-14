@@ -31,7 +31,7 @@ class TaskService {
   Future<void> addTask(Task task, String categoryId) async {
     final docRef = await _tasksCollection.add({
       'title': task.title,
-      'time': task.time,
+      // 'time': task.time,
       'categoryName': task.category,
       'categoryId': categoryId,
       'colorValue': task.color.value,
@@ -39,59 +39,31 @@ class TaskService {
       'createdAt': FieldValue.serverTimestamp(),
       'dueTimestamp': task.dueTimestamp,
       'dueDate': task.dueDate,
+      'isAllDay': task.isAllDay,
     });
 
     // Lập lịch thông báo
-    NotificationService.scheduleNotification(
-      id: docRef.id.hashCode,
-      title: 'Task Reminder: ${task.title}',
-      body: 'Your task is due now.',
-      scheduledTime: DateFormat('EEEE, d/M HH:mm').parse(task.time), // Chuyển chuỗi về DateTime
-    );
+    // Chỉ lập lịch thông báo nếu task có thời gian cụ thể
+    if (task.dueTimestamp != null) {
+      NotificationService.scheduleNotification(
+        id: docRef.id.hashCode,
+        title: 'Task Reminder: ${task.title}',
+        body: 'Your task is due now.',
+        scheduledTime: task.dueTimestamp!.toDate(),
+      );
+    }
 
-    await _categoryService.updateTaskCount(categoryId, 1);
+
   }
 
   Future<void> updateTaskCompletion(String taskId, String categoryId, bool isCompleted) async {
-    if (categoryId.isEmpty) throw Exception("Category ID is missing");
-
-    final batch = _firestore.batch();
-
-    // 1. Cập nhật task
-    final taskRef = _tasksCollection.doc(taskId);
-    batch.update(taskRef, {'isCompleted': isCompleted});
-
-    // 2. Cập nhật taskCount
-    final categoryRef = _categoryService.getCategoryReference(categoryId);
-    final int increment = isCompleted ? -1 : 1;
-    batch.update(categoryRef, {'taskCount': FieldValue.increment(increment)});
-
-    await batch.commit();
+    // Chỉ cần cập nhật trạng thái của task
+    await _tasksCollection.doc(taskId).update({'isCompleted': isCompleted});
   }
 
   Future<void> deleteTask(String taskId, String categoryId) async {
-    if (categoryId.isEmpty) throw Exception("Category ID is missing");
-
-    // 1. Lấy thông tin của task TRƯỚC KHI xóa
-    final taskDoc = await _tasksCollection.doc(taskId).get();
-
-    if (!taskDoc.exists) return; // Nếu task không tồn tại, không làm gì cả
-
-    final taskData = taskDoc.data() as Map<String, dynamic>;
-    final bool wasCompleted = taskData['isCompleted'] ?? false;
-
-    final batch = _firestore.batch();
-    final taskRef = _tasksCollection.doc(taskId);
-    batch.delete(taskRef); // Lên lịch xóa task
-
-    // 2. Chỉ giảm count nếu task đó CHƯA được hoàn thành
-    if (!wasCompleted) {
-      final categoryRef = _categoryService.getCategoryReference(categoryId);
-      batch.update(categoryRef, {'taskCount': FieldValue.increment(-1)});
-    }
-
-    // 3. Thực thi tất cả các hành động
-    await batch.commit();
+    // Chỉ cần xóa task
+    await _tasksCollection.doc(taskId).delete();
   }
 
   Future<void> deleteTasksForCategory(String categoryName) async {
@@ -106,18 +78,19 @@ class TaskService {
   Future<void> updateTask(Task task, String oldCategoryId) async {
     if (task.id == null || task.categoryId == null) return;
 
-    // 1. Cập nhật dữ liệu của task trên Firestore
+    // Cập nhật dữ liệu của task trên Firestore
     await _tasksCollection.doc(task.id).update({
       'title': task.title,
-      'time': task.time,
+      // 'time': task.time,
       'categoryName': task.category,
       'categoryId': task.categoryId,
       'colorValue': task.color.value,
       'dueTimestamp': task.dueTimestamp,
       'dueDate': task.dueDate,
+      'isAllDay': task.isAllDay,
     });
 
-    // 2. Lập lịch lại thông báo với thời gian mới
+    // Lập lịch lại thông báo với thời gian mới
     //    Sử dụng dueTimestamp.toDate() để có DateTime chính xác
     if (task.dueTimestamp != null) {
       NotificationService.scheduleNotification(
@@ -128,14 +101,6 @@ class TaskService {
       );
     }
 
-    // 3. Cập nhật taskCount nếu category bị thay đổi
-    //    Chỉ cập nhật nếu task chưa được hoàn thành
-    if (!task.isCompleted && oldCategoryId != task.categoryId) {
-      // Giảm count của category cũ
-      await _categoryService.updateTaskCount(oldCategoryId, -1);
-      // Tăng count của category mới
-      await _categoryService.updateTaskCount(task.categoryId!, 1);
-    }
   }
 
   Stream<QuerySnapshot> getTodaysTasksStream() {
@@ -147,13 +112,22 @@ class TaskService {
   }
 
   Stream<QuerySnapshot> getTasksForTodayStream() {
-    // Lấy chuỗi ngày của hôm nay theo định dạng yyyy-MM-dd
-    final String todayDateString = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    // Lấy thời điểm hiện tại
+    final DateTime now = DateTime.now();
 
-    // Truy vấn bằng cách so sánh chuỗi trực tiếp
+    // Xác định thời điểm bắt đầu của ngày hôm nay
+    final DateTime startOfToday = DateTime(now.year, now.month, now.day);
+
+    // Xác định thời điểm kết thúc của ngày hôm nay
+    final DateTime endOfToday = startOfToday.add(const Duration(days: 1));
+
+    // Truy vấn các task có dueTimestamp nằm trong khoảng từ đầu ngày đến cuối ngày
     return _tasksCollection
         .where('isCompleted', isEqualTo: false)
-        .where('dueDate', isEqualTo: todayDateString)
+        .where('dueTimestamp', isGreaterThanOrEqualTo: startOfToday)
+        .where('dueTimestamp', isLessThan: endOfToday)
+        .orderBy('isAllDay', descending: false)
+        .orderBy('dueTimestamp', descending: false)
         .limit(4)
         .snapshots();
   }
@@ -235,6 +209,14 @@ class TaskService {
     } catch (e, st) {
       print('DEBUG: error during debugTasksForToday: $e\n$st');
     }
+  }
+
+  Stream<int> getIncompleteTasksCountStreamForCategory(String categoryId) {
+    return _tasksCollection
+        .where('categoryId', isEqualTo: categoryId)
+        .where('isCompleted', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length); // Trả về stream của số lượng document
   }
 
 }
