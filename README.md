@@ -1,16 +1,29 @@
-# my_todo_app
+# 📝 Taskflow - Ứng dụng Ghi chú bằng Flutter
 
-A new Flutter project.
+Một ứng dụng quản lý công việc đơn giản và hiệu quả được xây dựng bằng Flutter và Firebase, giúp bạn không bỏ lỡ bất kỳ nhiệm vụ quan trọng nào.
 
-## Getting Started
 
-This project is a starting point for a Flutter application.
 
-A few resources to get you started if this is your first Flutter project:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## ✨ Tính năng chính
+
+* **Xác thực người dùng:** Đăng ký và đăng nhập an toàn bằng Email & Mật khẩu với **Firebase Authentication**.
+* **Quản lý công việc thông minh:** Dễ dàng thêm, sửa, xóa, và đánh dấu hoàn thành các công việc.
+* **Phân loại công việc:** Tổ chức các nhiệm vụ vào những danh mục (categories) tùy chỉnh.
+* **Đồng bộ hóa thời gian thực:** Tất cả dữ liệu được lưu trữ và đồng bộ hóa ngay lập tức trên các thiết bị nhờ **Cloud Firestore**.
+
+---
+
+## 🛠️ Công nghệ sử dụng
+
+* **Framework:** Flutter
+* **Ngôn ngữ:** Dart
+* **Backend & Cơ sở dữ liệu:** Firebase
+    * Firebase Authentication
+    * Cloud Firestore
+* **Thông báo:** `flutter_local_notifications`
+* **Quản lý gói:** Pub
+
+---
